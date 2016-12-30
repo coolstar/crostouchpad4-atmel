@@ -604,7 +604,7 @@ Status
 NTSTATUS
 OnD0Exit(
 _In_  WDFDEVICE               FxDevice,
-_In_  WDF_POWER_DEVICE_STATE  FxPreviousState
+_In_  WDF_POWER_DEVICE_STATE  FxTargetState
 )
 /*++
 
@@ -615,7 +615,7 @@ This routine destroys objects needed by the driver.
 Arguments:
 
 FxDevice - a handle to the framework device object
-FxPreviousState - previous power state
+FxTargetState - the target power state
 
 Return Value:
 
@@ -623,15 +623,18 @@ Status
 
 --*/
 {
-	UNREFERENCED_PARAMETER(FxPreviousState);
+	UNREFERENCED_PARAMETER(FxTargetState);
 
 	PATMELTP_CONTEXT pDevice = GetDeviceContext(FxDevice);
 
 	if (pDevice->multitouch == MXT_TOUCH_MULTITOUCHSCREEN_T100)
 		mxt_set_t7_power_cfg(pDevice, MXT_POWER_CFG_DEEPSLEEP);
 	else {
+		if (FxTargetState != 5) {
 		struct mxt_object *obj = mxt_findobject(&pDevice->core, MXT_TOUCH_MULTI_T9);
 		mxt_write_object_off(pDevice, obj, MXT_T9_CTRL, 0);
+		
+		}	
 	}
 
 	WdfTimerStop(pDevice->Timer, TRUE);
