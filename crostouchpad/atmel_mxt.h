@@ -64,7 +64,7 @@
 * I have rewritten the linux mess for the most part.
 */
 
-#include <stdint.h>
+#include "stdint.h"
 
 #ifndef __packed
 #define __packed( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )

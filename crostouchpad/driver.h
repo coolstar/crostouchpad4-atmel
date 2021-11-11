@@ -27,8 +27,6 @@
 #define DRIVERNAME                 "crostouchpad4.sys: "
 
 #define ATMELTP_POOL_TAG            (ULONG) 'lmtA'
-#define ATMELTP_HARDWARE_IDS        L"CoolStar\\ATML0000\0\0"
-#define ATMELTP_HARDWARE_IDS_LENGTH sizeof(ATMELTP_HARDWARE_IDS)
 
 #define NTDEVICE_NAME_STRING       L"\\Device\\ATML0000"
 #define SYMBOLIC_NAME_STRING       L"\\DosDevices\\ATML0000"
@@ -299,8 +297,6 @@ DRIVER_INITIALIZE DriverEntry;
 EVT_WDF_DRIVER_UNLOAD AtmelTPDriverUnload;
 
 EVT_WDF_DRIVER_DEVICE_ADD AtmelTPEvtDeviceAdd;
-
-EVT_WDFDEVICE_WDM_IRP_PREPROCESS AtmelTPEvtWdmPreprocessMnQueryId;
 
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL AtmelTPEvtInternalDeviceControl;
 
