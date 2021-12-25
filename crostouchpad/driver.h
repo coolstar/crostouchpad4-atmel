@@ -26,7 +26,7 @@
 
 #define DRIVERNAME                 "crostouchpad4.sys: "
 
-#define ATMELTP_POOL_TAG            (ULONG) 'lmtA'
+#define ATMELTP_POOL_TAG            (ULONG) 'aptA'
 
 #define NTDEVICE_NAME_STRING       L"\\Device\\ATML0000"
 #define SYMBOLIC_NAME_STRING       L"\\DosDevices\\ATML0000"
