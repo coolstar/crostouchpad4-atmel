@@ -311,8 +311,8 @@ NTSTATUS BOOTTRACKPAD(
 		core->objs = (struct mxt_object *)((uint8_t*)core->buf +
 			sizeof(core->info));
 
-		devContext->msgprocobj = mxt_findobject(&core, MXT_GEN_MESSAGEPROCESSOR);
-		devContext->cmdprocobj = mxt_findobject(&core, MXT_GEN_COMMANDPROCESSOR);
+		devContext->msgprocobj = mxt_findobject(core, MXT_GEN_MESSAGEPROCESSOR);
+		devContext->cmdprocobj = mxt_findobject(core, MXT_GEN_COMMANDPROCESSOR);
 
 		int reportid = 1;
 		for (int i = 0; i < core->nobjs; i++) {
