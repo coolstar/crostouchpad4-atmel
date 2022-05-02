@@ -216,8 +216,6 @@ typedef struct _ATMELTP_CONTEXT
 
 	BOOLEAN TrackpadBooted;
 
-	WDFTIMER Timer;
-
 	mxt_message_t lastmsg;
 
 	struct mxt_rollup core;

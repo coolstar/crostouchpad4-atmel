@@ -628,8 +628,6 @@ Status
 	PATMELTP_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	NTSTATUS status = STATUS_SUCCESS;
 
-	WdfTimerStart(pDevice->Timer, WDF_REL_TIMEOUT_IN_MS(10));
-
 	atmel_reset_device(pDevice);
 
 	for (int i = 0; i < 20; i++){
@@ -674,8 +672,6 @@ Status
 		struct mxt_object *obj = mxt_findobject(&pDevice->core, MXT_TOUCH_MULTI_T9);
 		mxt_write_object_off(pDevice, obj, MXT_T9_CTRL, 0);
 	}
-
-	WdfTimerStop(pDevice->Timer, TRUE);
 
 	pDevice->ConnectInterrupt = false;
 
@@ -986,55 +982,6 @@ BOOLEAN OnInterruptIsr(
 	return ret;
 }
 
-VOID
-AtmelTPReadWriteWorkItem(
-	IN WDFWORKITEM  WorkItem
-	)
-{
-	WDFDEVICE Device = (WDFDEVICE)WdfWorkItemGetParentObject(WorkItem);
-	PATMELTP_CONTEXT pDevice = GetDeviceContext(Device);
-
-	WdfObjectDelete(WorkItem);
-
-	if (!pDevice->TrackpadBooted)
-		return;
-
-	if (!pDevice->ConnectInterrupt)
-		return;
-
-	AtmelTpProcessInput(pDevice);
-}
-
-void AtmelTPTimerFunc(_In_ WDFTIMER hTimer){
-	return;
-	WDFDEVICE Device = (WDFDEVICE)WdfTimerGetParentObject(hTimer);
-	PATMELTP_CONTEXT pDevice = GetDeviceContext(Device);
-
-	if (!pDevice->ConnectInterrupt)
-		return;
-
-	if (!pDevice->RegsSet)
-		return;
-
-	PATMELTP_CONTEXT context;
-	WDF_OBJECT_ATTRIBUTES attributes;
-	WDF_WORKITEM_CONFIG workitemConfig;
-	WDFWORKITEM hWorkItem;
-
-	WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-	WDF_OBJECT_ATTRIBUTES_SET_CONTEXT_TYPE(&attributes, ATMELTP_CONTEXT);
-	attributes.ParentObject = Device;
-	WDF_WORKITEM_CONFIG_INIT(&workitemConfig, AtmelTPReadWriteWorkItem);
-
-	WdfWorkItemCreate(&workitemConfig,
-		&attributes,
-		&hWorkItem);
-
-	WdfWorkItemEnqueue(hWorkItem);
-
-	return;
-}
-
 NTSTATUS
 AtmelTPEvtDeviceAdd(
 IN WDFDRIVER       Driver,
@@ -1165,21 +1112,6 @@ IN PWDFDEVICE_INIT DeviceInit
 			"Error creating WDF interrupt object - %!STATUS!",
 			status);
 
-		return status;
-	}
-
-	WDF_TIMER_CONFIG              timerConfig;
-	WDFTIMER                      hTimer;
-
-	WDF_TIMER_CONFIG_INIT_PERIODIC(&timerConfig, AtmelTPTimerFunc, 10);
-
-	WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-	attributes.ParentObject = device;
-	status = WdfTimerCreate(&timerConfig, &attributes, &hTimer);
-	devContext->Timer = hTimer;
-	if (!NT_SUCCESS(status))
-	{
-		AtmelTPPrint(DEBUG_LEVEL_ERROR, DBG_PNP, "(%!FUNC!) WdfTimerCreate failed status:%!STATUS!\n", status);
 		return status;
 	}
 
