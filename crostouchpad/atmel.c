@@ -1,12 +1,10 @@
 #define DESCRIPTOR_DEF
 #include "driver.h"
 
-#define bool int
-
 static ULONG AtmelTPDebugLevel = 100;
 static ULONG AtmelTPDebugCatagories = DBG_INIT || DBG_PNP || DBG_IOCTL;
 
-int AtmelTPProcessMessagesUntilInvalid(PATMELTP_CONTEXT pDevice);
+uint8_t AtmelTPProcessMessagesUntilInvalid(PATMELTP_CONTEXT pDevice);
 
 NTSTATUS
 DriverEntry(
@@ -45,12 +43,12 @@ __in PUNICODE_STRING RegistryPath
 	return status;
 }
 
-static size_t mxt_obj_size(const struct mxt_object *obj)
+static uint8_t mxt_obj_size(const struct mxt_object *obj)
 {
 	return obj->size_minus_one + 1;
 }
 
-static size_t mxt_obj_instances(const struct mxt_object *obj)
+static uint8_t mxt_obj_instances(const struct mxt_object *obj)
 {
 	return obj->instances_minus_one + 1;
 }
@@ -101,7 +99,7 @@ mxt_write_reg(PATMELTP_CONTEXT  devContext, uint16_t reg, uint8_t val)
 
 static NTSTATUS
 mxt_write_object_off(PATMELTP_CONTEXT  devContext, struct mxt_object *obj,
-	int offset, uint8_t val)
+	uint16_t offset, uint8_t val)
 {
 	uint16_t reg = obj->start_address;
 
@@ -241,7 +239,6 @@ AtmelTPBootWorkItem(
 
 void AtmelTPBootTimer(_In_ WDFTIMER hTimer) {
 	WDFDEVICE Device = (WDFDEVICE)WdfTimerGetParentObject(hTimer);
-	PATMELTP_CONTEXT pDevice = GetDeviceContext(Device);
 
 	WDF_OBJECT_ATTRIBUTES attributes;
 	WDF_WORKITEM_CONFIG workitemConfig;
@@ -314,7 +311,7 @@ NTSTATUS BOOTTRACKPAD(
 		devContext->msgprocobj = mxt_findobject(core, MXT_GEN_MESSAGEPROCESSOR);
 		devContext->cmdprocobj = mxt_findobject(core, MXT_GEN_COMMANDPROCESSOR);
 
-		int reportid = 1;
+		uint8_t reportid = 1;
 		for (int i = 0; i < core->nobjs; i++) {
 			struct mxt_object* obj = &core->objs[i];
 			uint8_t min_id, max_id;
@@ -430,7 +427,7 @@ NTSTATUS BOOTTRACKPAD(
 
 		WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
 		attributes.ParentObject = devContext->FxDevice;
-		NTSTATUS status = WdfTimerCreate(&timerConfig, &attributes, &hTimer);
+		status = WdfTimerCreate(&timerConfig, &attributes, &hTimer);
 
 		WdfTimerStart(hTimer, WDF_REL_TIMEOUT_IN_MS(200));
 
@@ -709,14 +706,14 @@ int AtmelTPProcessMessage(PATMELTP_CONTEXT pDevice, uint8_t *message) {
 		return 0;
 
 	if (report_id == pDevice->T6_reportid) {
-		uint8_t status = message[1];
-		uint32_t crc = message[2] | (message[3] << 8) | (message[4] << 16);
+		//uint8_t status = message[1];
+		//uint32_t crc = message[2] | (message[3] << 8) | (message[4] << 16);
 	}
 	else if (report_id >= pDevice->T9_reportid_min && report_id <= pDevice->T9_reportid_max) {
 		uint8_t flags = message[1];
 
-		int rawx = (message[2] << 4) | ((message[4] >> 4) & 0xf);
-		int rawy = (message[3] << 4) | ((message[4] & 0xf));
+		uint16_t rawx = (message[2] << 4) | ((message[4] >> 4) & 0xf);
+		uint16_t rawy = (message[3] << 4) | ((message[4] & 0xf));
 
 		/* Handle 10/12 bit switching */
 		if (pDevice->max_x < 1024)
@@ -725,7 +722,7 @@ int AtmelTPProcessMessage(PATMELTP_CONTEXT pDevice, uint8_t *message) {
 			rawy >>= 2;
 
 		uint8_t area = message[5];
-		uint8_t ampl = message[6];
+		//uint8_t ampl = message[6];
 
 		pDevice->Flags[report_id] = flags;
 		pDevice->XValue[report_id] = rawx;
@@ -753,8 +750,8 @@ int AtmelTPProcessMessage(PATMELTP_CONTEXT pDevice, uint8_t *message) {
 		else if (pDevice->Flags[reportid] & MXT_T9_DETECT)
 			t9_flags += MXT_T9_RELEASE;
 
-		int rawx = *((uint16_t *)&message[2]);
-		int rawy = *((uint16_t *)&message[4]);
+		uint16_t rawx = *((uint16_t *)&message[2]);
+		uint16_t rawy = *((uint16_t *)&message[4]);
 
 		if (reportid >= 0) {
 			pDevice->Flags[reportid] = t9_flags;
@@ -781,13 +778,16 @@ int AtmelTPProcessMessage(PATMELTP_CONTEXT pDevice, uint8_t *message) {
 	return 1;
 }
 
-int AtmelReadAndProcessMessages(PATMELTP_CONTEXT pDevice, uint8_t count) {
+uint8_t AtmelReadAndProcessMessages(PATMELTP_CONTEXT pDevice, uint8_t count) {
 	uint8_t num_valid = 0;
-	int i, ret;
+	int ret;
 	if (count > pDevice->max_reportid)
-		return -1;
+		return 0;
 
 	uint8_t *msg_buf = (uint8_t *)ExAllocatePoolWithTag(NonPagedPool, pDevice->max_reportid * pDevice->T5_msg_size, ATMELTP_POOL_TAG);
+	if (!msg_buf) {
+		return 0;
+	}
 
 	for (int i = 0; i < pDevice->max_reportid * pDevice->T5_msg_size; i++) {
 		msg_buf[i] = 0xff;
@@ -799,7 +799,7 @@ int AtmelReadAndProcessMessages(PATMELTP_CONTEXT pDevice, uint8_t count) {
 		return 0;
 	}
 
-	for (i = 0; i < count; i++) {
+	for (uint8_t i = 0; i < count; i++) {
 		ret = AtmelTPProcessMessage(pDevice,
 			msg_buf + pDevice->T5_msg_size * i);
 
@@ -813,8 +813,8 @@ int AtmelReadAndProcessMessages(PATMELTP_CONTEXT pDevice, uint8_t count) {
 	return num_valid;
 }
 
-int AtmelTPProcessMessagesUntilInvalid(PATMELTP_CONTEXT pDevice) {
-	int count, read;
+uint8_t AtmelTPProcessMessagesUntilInvalid(PATMELTP_CONTEXT pDevice) {
+	uint8_t count, read;
 	uint8_t tries = 2;
 
 	count = pDevice->max_reportid;
@@ -823,7 +823,7 @@ int AtmelTPProcessMessagesUntilInvalid(PATMELTP_CONTEXT pDevice) {
 		if (read < count)
 			return 0;
 	} while (--tries);
-	return -1;
+	return 0;
 }
 
 bool AtmelTPDeviceReadT44(PATMELTP_CONTEXT pDevice) {
@@ -831,6 +831,9 @@ bool AtmelTPDeviceReadT44(PATMELTP_CONTEXT pDevice) {
 	uint8_t count, num_left;
 
 	uint8_t *msg_buf = (uint8_t *)ExAllocatePoolWithTag(NonPagedPool, pDevice->T5_msg_size + 1, ATMELTP_POOL_TAG);
+	if (!msg_buf) {
+		return false;
+	}
 
 	/* Read T44 and T5 together */
 	status = mxt_read_reg(pDevice, pDevice->T44_address, msg_buf, pDevice->T5_msg_size);
@@ -868,7 +871,7 @@ end:
 }
 
 bool AtmelTPDeviceRead(PATMELTP_CONTEXT pDevice) {
-	int total_handled, num_handled;
+	uint8_t total_handled, num_handled;
 	uint8_t count = pDevice->last_message_count;
 
 	if (count < 1 || count > pDevice->max_reportid)
@@ -916,11 +919,11 @@ void AtmelTpProcessInput(PATMELTP_CONTEXT pDevice) {
 
 	pDevice->BUTTONPRESSED = pDevice->T19_buttonstate;
 
-	pDevice->TIMEINT += DIFF.QuadPart;
+	pDevice->TIMEINT += (USHORT)DIFF.QuadPart;
 
 	pDevice->LastTime = CurrentTime;
 
-	int count = 0, i = 0;
+	BYTE count = 0, i = 0;
 	while (count < 5 && i < 20) {
 		if (pDevice->Flags[i] != 0) {
 			report.Touch[count].ContactID = i;
@@ -994,7 +997,6 @@ IN PWDFDEVICE_INIT DeviceInit
 	WDFDEVICE                     device;
 	WDF_INTERRUPT_CONFIG interruptConfig;
 	WDFQUEUE                      queue;
-	UCHAR                         minorFunction;
 	PATMELTP_CONTEXT               devContext;
 
 	UNREFERENCED_PARAMETER(Driver);
@@ -1350,6 +1352,8 @@ AtmelTPGetReportDescriptor(
 	OUT BOOLEAN* CompleteRequest
 )
 {
+	UNREFERENCED_PARAMETER(CompleteRequest);
+
 	NTSTATUS            status = STATUS_SUCCESS;
 	ULONG_PTR           bytesToCopy;
 	WDFMEMORY           memory;
@@ -1577,10 +1581,11 @@ IN PATMELTP_CONTEXT DevContext,
 IN WDFREQUEST Request
 )
 {
+	UNREFERENCED_PARAMETER(DevContext);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
-	size_t bytesWritten = 0;
 
 	AtmelTPPrint(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
 		"AtmelTPWriteReport Entry\n");
@@ -1760,6 +1765,8 @@ IN WDFREQUEST Request,
 OUT BOOLEAN* CompleteRequest
 )
 {
+	UNREFERENCED_PARAMETER(CompleteRequest);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
@@ -1846,6 +1853,8 @@ IN WDFREQUEST Request,
 OUT BOOLEAN* CompleteRequest
 )
 {
+	UNREFERENCED_PARAMETER(CompleteRequest);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
