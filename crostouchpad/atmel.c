@@ -117,11 +117,22 @@ atmel_reset_device(PATMELTP_CONTEXT  devContext)
 static NTSTATUS mxt_read_t9_resolution(PATMELTP_CONTEXT devContext)
 {
 	struct t9_range range;
+	UINT8 xsize, ysize;
 	unsigned char orient;
 	NTSTATUS status;
 
 	struct mxt_rollup core = devContext->core;
 	struct mxt_object *resolutionobject = mxt_findobject(&core, MXT_TOUCH_MULTI_T9);
+
+	status = mxt_read_reg(devContext, resolutionobject->start_address + MXT_T9_XSIZE, &xsize, sizeof(xsize));
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	status = mxt_read_reg(devContext, resolutionobject->start_address + MXT_T9_YSIZE, &ysize, sizeof(ysize));
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	status = mxt_read_reg(devContext, resolutionobject->start_address + MXT_T9_RANGE, &range, sizeof(range));
 	if (!NT_SUCCESS(status)) {
@@ -143,10 +154,16 @@ static NTSTATUS mxt_read_t9_resolution(PATMELTP_CONTEXT devContext)
 	if (orient & MXT_T9_ORIENT_SWITCH) {
 		devContext->max_x = range.y + 1;
 		devContext->max_y = range.x + 1;
+
+		devContext->phy_x = ysize * 50;
+		devContext->phy_y = xsize * 50;
 	}
 	else {
 		devContext->max_x = range.x + 1;
 		devContext->max_y = range.y + 1;
+
+		devContext->phy_x = xsize * 50;
+		devContext->phy_y = ysize * 50;
 	}
 	AtmelTPPrint(DEBUG_LEVEL_INFO, DBG_PNP, "Screen Size: X: %d Y: %d\n", devContext->max_x, devContext->max_y);
 	return status;
@@ -204,6 +221,9 @@ static NTSTATUS mxt_read_t100_config(PATMELTP_CONTEXT devContext)
 	if (tchaux & MXT_T100_TCHAUX_AREA)
 		devContext->t100_aux_area = aux++;
 	AtmelTPPrint(DEBUG_LEVEL_INFO, DBG_PNP, "Screen Size T100: X: %d Y: %d\n", devContext->max_x, devContext->max_y);
+
+	devContext->phy_x = devContext->max_x;
+	devContext->phy_y = devContext->max_y;
 	return status;
 }
 
@@ -279,7 +299,7 @@ NTSTATUS BOOTTRACKPAD(
 
 		if (core->nobjs < 0 || core->nobjs > 1024) {
 			AtmelTPPrint(DEBUG_LEVEL_ERROR, DBG_PNP, "init_device nobjs (%d) out of bounds\n",
-				core.nobjs);
+				core->nobjs);
 		}
 
 		blksize = sizeof(core->info) +
@@ -299,7 +319,7 @@ NTSTATUS BOOTTRACKPAD(
 			AtmelTPPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
 				"init_device: configuration space "
 				"crc mismatch %08x/%08x\n",
-				crc, obp_crc24(core.buf, blksize));
+				crc, obp_crc24(core->buf, blksize));
 		}
 		else {
 			AtmelTPPrint(DEBUG_LEVEL_ERROR, DBG_PNP, "CRC Matched!\n");
@@ -397,9 +417,6 @@ NTSTATUS BOOTTRACKPAD(
 
 			devContext->max_y_hid[0] = max_y8bit[0];
 			devContext->max_y_hid[1] = max_y8bit[1];
-
-			devContext->phy_x = devContext->max_x;
-			devContext->phy_y = devContext->max_y;
 
 			uint16_t phy_x[] = { devContext->phy_x };
 			uint16_t phy_y[] = { devContext->phy_y };
